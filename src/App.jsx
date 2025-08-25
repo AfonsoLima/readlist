@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
+import { supabase } from './lib/supabase'
+import Login from './components/Login'
 
 /** @typedef {"Lido" | "Não lido"} Status */
 
@@ -14,6 +16,18 @@ const KEY_ARTICLES = "readlist_articles_v1";
 const KEY_TAGS = "readlist_tags_v1";
 
 export default function App() {
+  // ---- Sessão Supabase (login) ----
+  const [session, setSession] = useState(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (!session) return <Login />
+
+  // ---- Estados locais da UI (por enquanto em localStorage) ----
   const [url, setUrl] = useState("");
   const [articles, setArticles] = useState(() => {
     const raw = localStorage.getItem(KEY_ARTICLES);
@@ -41,7 +55,7 @@ export default function App() {
         const a = sp.get('author') || '';
         setPrefill({ title: t, author: a });
         setPendingFromBookmarklet(true);
-        // Limpa querystring para evitar salvar bookmarks com dados efêmeros
+        // Limpa querystring
         const newUrl = window.location.origin + window.location.pathname + window.location.hash;
         window.history.replaceState(null, '', newUrl);
       }
@@ -301,28 +315,3 @@ function InlineEdit({ value, onChange, placeholder }) {
 const style = document.createElement('style');
 style.innerHTML = `.border-neutral-850\/50{border-color: rgba(38,38,38,0.5);}`;
 document.head.appendChild(style);
-import { useEffect, useState } from 'react'
-import { supabase } from './lib/supabase'
-import Login from './components/Login'
-
-export default function App() {
-  const [session, setSession] = useState(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => subscription.unsubscribe()
-  }, [])
-
-  if (!session) {
-    return <Login />
-  }
-
-  return (
-    <div>
-      {/* aqui depois vamos colocar sua tabela de artigos */}
-      <h1>Read List</h1>
-    </div>
-  )
-}
-
