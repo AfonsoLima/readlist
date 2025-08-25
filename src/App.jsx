@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
-import { supabase } from './lib/supabase'
-import Login from './components/Login'
+import { supabase } from './lib/supabase.js'
+import Login from './components/Login.jsx'
 
 /** @typedef {"Lido" | "Não lido"} Status */
 
