@@ -301,3 +301,28 @@ function InlineEdit({ value, onChange, placeholder }) {
 const style = document.createElement('style');
 style.innerHTML = `.border-neutral-850\/50{border-color: rgba(38,38,38,0.5);}`;
 document.head.appendChild(style);
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
+import Login from './components/Login'
+
+export default function App() {
+  const [session, setSession] = useState(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (!session) {
+    return <Login />
+  }
+
+  return (
+    <div>
+      {/* aqui depois vamos colocar sua tabela de artigos */}
+      <h1>Read List</h1>
+    </div>
+  )
+}
+
