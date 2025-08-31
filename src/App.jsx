@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
 import { supabase } from './lib/supabase.js'
-import Login from './components/Login.jsx'
+import LoginPassword from './components/LoginPassword.jsx'
 import {
   listArticles,
   addArticle as addArticleDb,
@@ -175,7 +175,7 @@ export default function App() {
   const uniqueTags = useMemo(() => ["Todos", ...tags], [tags]);
 
   // ---- Render ----
-  if (!session) return <Login />;
+  if (!session) return <LoginPassword />;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
