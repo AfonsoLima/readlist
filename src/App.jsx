@@ -3,6 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
 import { supabase } from './lib/supabase.js'
 import Login from './components/Login.jsx'
+import {
+  listArticles,
+  addArticle as addArticleDb,
+  updateArticleFields,
+  toggleRead as toggleReadDb,
+  removeArticle as removeArticleDb
+} from './services/articles.js'
 
 /** @typedef {"Lido" | "Não lido"} Status */
 
@@ -11,38 +18,48 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const fmtDate = (d) => new Date(d).toLocaleString("pt-BR", { hour12: false });
 const isValidUrl = (s) => { try { new URL(s); return true; } catch { return false; } };
 
-// ==== Storage Keys ====
-const KEY_ARTICLES = "readlist_articles_v1";
+// ==== Storage Keys (mantidos apenas para valor inicial de tags) ====
 const KEY_TAGS = "readlist_tags_v1";
 
 export default function App() {
   // ---- Sessão Supabase (login) ----
-  const [session, setSession] = useState(null)
-
+  const [session, setSession] = useState(null);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => subscription.unsubscribe()
-  }, [])
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
 
-  if (!session) return <Login />
-
-  // ---- Estados locais da UI (por enquanto em localStorage) ----
+  // ---- Estados da UI ----
   const [url, setUrl] = useState("");
-  const [articles, setArticles] = useState(() => {
-    const raw = localStorage.getItem(KEY_ARTICLES);
-    return raw ? JSON.parse(raw) : [];
-  });
+  const [articles, setArticles] = useState([]); // agora vem do Supabase
   const [tags, setTags] = useState(() => {
     const raw = localStorage.getItem(KEY_TAGS);
-    return raw ? JSON.parse(raw) : ["Geral", "Tecnologia", "Negócios", "Educação"]; // iniciais
+    return raw ? JSON.parse(raw) : ["Geral", "Tecnologia", "Negócios", "Educação"];
   });
   const [filters, setFilters] = useState({ tag: "Todos", status: "Todos", search: "" });
   const [prefill, setPrefill] = useState(null); // { title, author }
   const [pendingFromBookmarklet, setPendingFromBookmarklet] = useState(false);
 
-  useEffect(() => localStorage.setItem(KEY_ARTICLES, JSON.stringify(articles)), [articles]);
-  useEffect(() => localStorage.setItem(KEY_TAGS, JSON.stringify(tags)), [tags]);
+  // --- Carregar da nuvem + Realtime (apenas quando logado) ---
+  async function refresh() {
+    const rows = await listArticles();
+    setArticles(rows);
+  }
+
+  useEffect(() => {
+    if (!session) return;
+    refresh();
+
+    const channel = supabase
+      .channel('articles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, () => {
+        refresh();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel) };
+  }, [session]);
 
   // Recebe dados via querystring do bookmarklet (?url=&title=&author=)
   useEffect(() => {
@@ -59,36 +76,52 @@ export default function App() {
         const newUrl = window.location.origin + window.location.pathname + window.location.hash;
         window.history.replaceState(null, '', newUrl);
       }
-    } catch {/* ignore */}
+    } catch { /* ignore */ }
   }, []);
 
-  const onAddUrl = (e) => {
+  // ---- Ações (agora usando Supabase) ----
+  const onAddUrl = async (e) => {
     e?.preventDefault?.();
     const trimmed = url.trim();
     if (!trimmed) return;
     if (!isValidUrl(trimmed)) { alert("URL inválida. Tente algo como https://exemplo.com/artigo"); return; }
     if (articles.some(a => a.url === trimmed)) { alert("Essa URL já está na lista."); return; }
 
-    const u = new URL(trimmed);
-    const defaultTitle = (u.hostname.replace(/^www\./, "") + u.pathname).replace(/\/+$/, "");
-
-    const newItem = {
-      id: uid(),
-      title: (prefill?.title && prefill.title.trim()) || defaultTitle || trimmed,
-      author: (prefill?.author && prefill.author.trim()) || "",
-      url: trimmed,
-      tag: tags[0] || "Geral",
-      savedAt: new Date().toISOString(),
-      status: /** @type {Status} */("Não lido"),
-    };
-    setArticles(prev => [newItem, ...prev]);
-    setUrl("");
-    setPrefill(null);
-    setPendingFromBookmarklet(false);
+    try {
+      const u = new URL(trimmed);
+      const defaultTitle = (u.hostname.replace(/^www\./, "") + u.pathname).replace(/\/+$/, "");
+      const created = await addArticleDb(trimmed, {
+        title: (prefill?.title && prefill.title.trim()) || defaultTitle || trimmed,
+        author: (prefill?.author && prefill.author.trim()) || "",
+        tag: tags[0] || "Geral"
+      });
+      // otimista
+      setArticles(prev => [created, ...prev]);
+      setUrl("");
+      setPrefill(null);
+      setPendingFromBookmarklet(false);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
-  const updateArticle = (id, patch) => setArticles(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
-  const removeArticle = (id) => setArticles(prev => prev.filter(a => a.id !== id));
+  const updateArticle = async (id, patch) => {
+    try {
+      await updateArticleFields(id, patch);
+      setArticles(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const removeArticle = async (id) => {
+    try {
+      await removeArticleDb(id);
+      setArticles(prev => prev.filter(a => a.id !== id));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const addNewTag = () => {
     const name = prompt("Nome da nova tag:");
@@ -96,10 +129,12 @@ export default function App() {
     if (!clean) return;
     if (tags.includes(clean)) { alert("Essa tag já existe."); return; }
     setTags(prev => [...prev, clean]);
+    localStorage.setItem(KEY_TAGS, JSON.stringify([...tags, clean]));
   };
 
   const clearAll = () => {
     if (!confirm("Tem certeza que deseja apagar todos os artigos?")) return;
+    // OBS: isso hoje só limpa a UI local.
     setArticles([]);
   };
 
@@ -138,6 +173,9 @@ export default function App() {
   }, [articles, filters]);
 
   const uniqueTags = useMemo(() => ["Todos", ...tags], [tags]);
+
+  // ---- Render ----
+  if (!session) return <Login />;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
@@ -262,13 +300,21 @@ export default function App() {
                 {/* Status + Ações */}
                 <div className="col-span-1 flex items-center justify-end gap-2">
                   <button
-                    onClick={()=>updateArticle(a.id,{ status: a.status === "Lido" ? "Não lido" : "Lido" })}
+                    onClick={async () => {
+                      try {
+                        const next = a.status !== "Lido";
+                        await toggleReadDb(a.id, next);
+                        setArticles(prev => prev.map(x => x.id === a.id ? { ...x, status: next ? "Lido" : "Não lido" } : x));
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    }}
                     className={`px-2 py-1 rounded-lg border text-xs flex items-center gap-1 ${a.status === "Lido" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-neutral-800 border-neutral-700 text-neutral-200"}`}
                     title={a.status === "Lido" ? "Marcar como Não lido" : "Marcar como Lido"}
                   >
                     {a.status === "Lido" ? <CheckCircle size={14}/> : <Circle size={14}/>} {a.status}
                   </button>
-                  <button onClick={()=>removeArticle(a.id)} className="p-2 rounded-lg hover:bg-neutral-800 text-neutral-300" title="Remover">
+                  <button onClick={() => removeArticle(a.id)} className="p-2 rounded-lg hover:bg-neutral-800 text-neutral-300" title="Remover">
                     <Trash2 size={16}/>
                   </button>
                 </div>
@@ -279,7 +325,7 @@ export default function App() {
 
         {/* Rodapé */}
         <div className="text-xs text-neutral-500 flex items-center gap-2">
-          <RefreshCcw size={14}/> Dados salvos no seu navegador (localStorage). Nenhum servidor necessário.
+          <RefreshCcw size={14}/> Dados agora sincronizados na nuvem (Supabase) e atualizados em tempo real.
         </div>
       </div>
     </div>
@@ -313,5 +359,5 @@ function InlineEdit({ value, onChange, placeholder }) {
 
 // ajuste fino de borda
 const style = document.createElement('style');
-style.innerHTML = `.border-neutral-850\/50{border-color: rgba(38,38,38,0.5);}`;
+style.innerHTML = `.border-neutral-850\\/50{border-color: rgba(38,38,38,0.5);}`;
 document.head.appendChild(style);
