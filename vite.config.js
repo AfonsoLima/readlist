@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// use exatamente o nome do repositório aqui
+// Vite vai gerar a build em "docs/" (combina com o Output Directory do Vercel)
 export default defineConfig({
   plugins: [react()],
-  base: '/readlist/',
-  build: { outDir: 'docs' }
+  build: {
+    outDir: 'docs',
+    emptyOutDir: true
+  }
 })
