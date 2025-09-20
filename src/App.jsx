@@ -1,7 +1,9 @@
+import SetPassword from './components/SetPassword.jsx';
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
-import { supabase } from './lib/supabase.js'
+// 🔧 usa o cliente único
+import { supabase } from './lib/supabaseClient';
 import LoginPassword from './components/LoginPassword.jsx'
 import {
   listArticles,
@@ -40,6 +42,9 @@ export default function App() {
   const [filters, setFilters] = useState({ tag: "Todos", status: "Todos", search: "" });
   const [prefill, setPrefill] = useState(null); // { title, author }
   const [pendingFromBookmarklet, setPendingFromBookmarklet] = useState(false);
+
+  // ✅ NOVO: controlar a abertura do formulário "Definir senha"
+  const [showSetPwd, setShowSetPwd] = useState(false);
 
   // --- Carregar da nuvem + Realtime (apenas quando logado) ---
   async function refresh() {
@@ -187,11 +192,18 @@ export default function App() {
             <p className="text-neutral-400 text-sm">Bookmarklet com confirmação → preenche e você confirma o salvamento.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={addExamples} className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm flex items-center gap-2"><Database size={16}/>Adicionar exemplos</button>
-            <button onClick={clearAll} className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm flex items-center gap-2"><Trash2 size={16}/>Limpar tudo</button>
-          </div>
-        </header>
+  <button
+    onClick={() => setShowSetPwd((v) => !v)}
+    className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm"
+  >
+    {showSetPwd ? 'Fechar' : 'Definir senha'}
+  </button>
 
+  <button onClick={addExamples} className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm flex items-center gap-2"><Database size={16}/>Adicionar exemplos</button>
+  <button onClick={clearAll} className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm flex items-center gap-2"><Trash2 size={16}/>Limpar tudo</button>
+</div>
+        </header>
+{showSetPwd && <SetPassword />}
         {/* Aviso quando vier do bookmarklet */}
         {pendingFromBookmarklet && (
           <div className="bg-indigo-950/30 border border-indigo-800/60 text-indigo-200 rounded-2xl p-3 flex items-start gap-2">
