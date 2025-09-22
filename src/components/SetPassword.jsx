@@ -1,6 +1,6 @@
 // src/components/SetPassword.jsx
 // import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase.js';
 
 export default function SetPassword() {
   const [pwd, setPwd] = useState('');
