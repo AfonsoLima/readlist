@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Circle, Trash2, Plus, Link2, Filter, Tag as TagIcon, RefreshCcw, Database, Info } from "lucide-react";
 // 🔧 usa o cliente único
-import { supabase } from './lib/supabaseClient';
+import { supabase } from './lib/supabase.js';
 import LoginPassword from './components/LoginPassword.jsx'
 import {
   listArticles,
