@@ -25,11 +25,33 @@ export default function SetPassword() {
       setLoading(true);
       const { error } = await supabase.auth.updateUser({ password: pwd });
       if (error) throw error;
+
       setMsg('Senha definida com sucesso! Faça logout e entre novamente com e-mail + senha.');
       setPwd('');
       setPwd2('');
     } catch (err) {
-      setMsg(err.message || 'Não foi possível definir a senha.');
+      // Se precisar de reautenticação, mandamos o e-mail de redefinição
+      const needsReauth = String(err?.message || '').toLowerCase().includes('reauth');
+      if (needsReauth) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.email) {
+            await supabase.auth.resetPasswordForEmail(user.email, {
+              redirectTo: window.location.origin, // volta para o app
+            });
+            setMsg(
+              `Enviamos um link de redefinição para ${user.email}. ` +
+              `Abra o e-mail, clique no link e, quando o app abrir, volte a clicar em “Salvar senha”.`
+            );
+          } else {
+            setMsg('Precisamos reenviar um link de redefinição, mas não conseguimos ler seu e-mail. Tente sair e entrar novamente.');
+          }
+        } catch (e2) {
+          setMsg(e2?.message || 'Não foi possível enviar o e-mail de redefinição.');
+        }
+      } else {
+        setMsg(err?.message || 'Não foi possível definir a senha.');
+      }
     } finally {
       setLoading(false);
     }
